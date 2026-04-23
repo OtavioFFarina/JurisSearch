@@ -1,0 +1,15 @@
+# Terminal 1: Python Service
+cd python-service
+source venv/bin/activate
+python main.py
+# (Test via: curl "http://localhost:8001/search?q=absolvição")
+
+# Terminal 2: Laravel Backend
+cd backend
+php artisan serve --port=8000
+# (Test via: curl "http://localhost:8000/api/search?q=absolvição")
+
+# Terminal 3: Frontend
+source ~/.nvm/nvm.sh
+cd frontend
+npm run dev
