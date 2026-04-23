@@ -50,6 +50,7 @@ class DatajudParser:
             return None
 
         titulo = self._build_titulo(source)
+        classe_nome = self._extract_classe(source)
         tribunal = self._extract_tribunal(source)
         resumo = self._build_resumo(source)
 
@@ -57,9 +58,17 @@ class DatajudParser:
             "titulo": titulo,
             "processo": self._format_processo(processo),
             "tribunal": tribunal,
+            "classe": classe_nome,
             "resumo": resumo,
             "movimentos_crus": self._extract_movimentos_crus(source),
         }
+
+    def _extract_classe(self, source: dict[str, Any]) -> str:
+        """Extract class name preserving source value."""
+        classe = source.get("classe", {})
+        if isinstance(classe, dict):
+            return classe.get("nome", "")
+        return ""
 
     def _build_titulo(self, source: dict[str, Any]) -> str:
         """Build title from class name and subject."""
@@ -90,16 +99,26 @@ class DatajudParser:
 
         return "TJSP"  # Default since we're querying TJSP endpoint
 
+    RESUMO_PREVIEW_SIZE = 5
+
     def _build_resumo(self, source: dict[str, Any]) -> str:
-        """Build summary from movements (most recent first)."""
+        """Build UI-only preview string from the first N movements.
+
+        WARNING — This is a display preview, NOT the authoritative record.
+        The full, faithful movement history lives in `movimentos_crus`
+        (see _extract_movimentos_crus). Do NOT consume this field for any
+        legal, audit or validation logic — it is intentionally truncated
+        for listing density.
+        """
         movimentos = source.get("movimentos", [])
         if not movimentos or not isinstance(movimentos, list):
             return "Sem movimentações disponíveis."
 
-        # Get the most relevant movements (last 5)
-        recent = movimentos[:5]
+        preview = movimentos[:self.RESUMO_PREVIEW_SIZE]
+        total = len(movimentos)
+
         parts = []
-        for mov in recent:
+        for mov in preview:
             if isinstance(mov, dict):
                 nome = mov.get("nome", "")
                 if nome:
@@ -108,25 +127,41 @@ class DatajudParser:
         if not parts:
             return "Sem movimentações disponíveis."
 
-        return ". ".join(parts) + "."
+        base = ". ".join(parts) + "."
+        if total > len(parts):
+            base += f" (+{total - len(parts)} movimentações)"
+        return base
 
     def _extract_movimentos_crus(self, source: dict[str, Any]) -> list[dict]:
-        """Extract a structured list of raw movements preserving original strings."""
+        """Extract ALL raw movements preserving original strings and order.
+
+        IMPORTANT — Legal fidelity rules:
+        - No truncation: every movement = 1 record.
+        - No deduplication: repeated events are preserved.
+        - Chronological order from source is kept intact.
+        """
         movimentos = source.get("movimentos", [])
         if not movimentos or not isinstance(movimentos, list):
             return []
-            
+
         crus = []
-        # Limita até os 20 mais recentes (já assumindo que DATAJUD retorna do mais recente pro mais antigo)
-        for mov in movimentos[:20]:
+        for mov in movimentos:
             if isinstance(mov, dict):
                 nome = mov.get("nome", "")
                 data = mov.get("dataHora", "")
-                
+
                 if nome:
+                    complementos = mov.get("complementosTabelados", [])
+                    descricao = ""
+                    if complementos and isinstance(complementos, list):
+                        partes = [c.get("descricao", "") or c.get("nome", "")
+                                  for c in complementos if isinstance(c, dict)]
+                        descricao = "; ".join(p for p in partes if p)
+
                     crus.append({
                         "movimento_original": nome,
-                        "data": data
+                        "data": data,
+                        "descricao": descricao,
                     })
         return crus
 

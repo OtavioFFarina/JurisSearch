@@ -1,51 +1,323 @@
-"""Ordered list of legal terms mapping.
+"""Explicit legal movement mapping — controlled dictionary.
 
-IMPORTANT: The order matters. 
-Items with higher specificity should appear earlier in the list.
-The matching process stops at the first match.
+Rules (from backup operacional):
+- No inference by substring or NLP.
+- Only exact labels (case-insensitive, whitespace-normalized, accent-stripped).
+- Each entry maps a DataJud movement name to a canonical tag.
+- If a movement is not in this dict, the canonical key is stored as-is
+  (preserving original via movimento_original).
 
-Tuple structure: ("termo específico minúsculo para busca", "termo_normalizado")
+Source base: movimentos mais frequentes do TJSP (área criminal e comum),
+alinhados com a Tabela Processual Unificada (TPU-CNJ). Ordem por categoria.
 """
 
-LEGAL_MAPPING = [
-    # Absolvição
-    ("sentença absolutória", "sentenca_absolutoria"),
-    ("absolvido", "absolvicao"),
-    ("absolvição", "absolvicao"),
-    ("improcedente", "absolvicao"),
-    ("improcedência", "absolvicao"),
-    ("inocentado", "absolvicao"),
-    
-    # Prisão / Trancamento / Extinção
-    ("alvará de soltura expedido", "alvara_soltura_expedido"),
-    ("alvará de soltura", "alvara_soltura"),
-    ("trancamento", "trancamento_acao"),
-    ("extinção da punibilidade", "extincao_punibilidade"),
-    ("baixa definitiva", "baixa_definitiva"),
-    ("arquivamento", "arquivamento"),
+LEGAL_MAPPING: dict[str, str] = {
+    # ── Distribuição ─────────────────────────────────────────
+    "distribuido": "distribuicao",
+    "distribuicao": "distribuicao",
+    "distribuido livremente": "distribuicao_livre",
+    "distribuido por sorteio": "distribuicao_sorteio",
+    "distribuido por dependencia": "distribuicao_dependencia",
+    "distribuido por prevencao": "distribuicao_prevencao",
+    "redistribuido": "redistribuicao",
+    "redistribuicao": "redistribuicao",
+    "recebimento": "recebimento",
+    "recebidos os autos": "recebimento_autos",
+    "autuacao": "autuacao",
 
-    # Condenação
-    ("sentença condenatória", "sentenca_condenatoria"),
-    ("condenado", "condenacao"),
-    ("condenação", "condenacao"),
-    ("procedente", "condenacao"),
-    ("culpado", "condenacao"),
-    ("trânsito em julgado", "transito_em_julgado"),
+    # ── Juntada ──────────────────────────────────────────────
+    "juntada": "juntada",
+    "documento juntado": "juntada_documento",
+    "juntada de documento": "juntada_documento",
+    "juntada de documentos": "juntada_documento",
+    "peticao juntada": "juntada_peticao",
+    "juntada de peticao": "juntada_peticao",
+    "juntada de manifestacao": "juntada_manifestacao",
+    "juntada de certidao": "juntada_certidao",
+    "juntada de ata de audiencia": "juntada_ata_audiencia",
+    "juntada de aviso de recebimento": "juntada_ar",
+    "juntada de aviso de recebimento (ar)": "juntada_ar",
+    "juntada de mandado": "juntada_mandado",
+    "juntada de mandado cumprido": "juntada_mandado_cumprido",
+    "juntada de oficio": "juntada_oficio",
+    "juntada de resposta": "juntada_resposta",
+    "juntada de laudo": "juntada_laudo",
+    "juntada de recurso": "juntada_recurso",
+    "juntada de contrarrazoes": "juntada_contrarrazoes",
+    "juntada de carta precatoria": "juntada_carta_precatoria",
+    "juntada de carta de intimacao": "juntada_carta_intimacao",
+    "juntada de procuracao": "juntada_procuracao",
+    "juntada de substabelecimento": "juntada_substabelecimento",
 
-    # Sentença Genérica
-    ("sentença", "sentenca_generica"),
-    ("acórdão", "acordao_generico"),
-    
-    # Movimentações ordinárias
-    ("documento juntado", "juntada_documento"),
-    ("juntada", "juntada_documento"),
-    ("mandado expedido", "mandado_expedido"),
-    ("mandado devolvido", "mandado_devolvido"),
-    ("conclusão", "conclusao"),
-    ("vista", "vista_aberta"),
-    ("publicado", "publicacao"),
-    ("expedição", "expedicao_generica"),
-    ("recebimento", "recebimento_generico"),
-    ("remessa", "remessa_generica"),
-    ("distribuição", "distribuicao"),
-]
+    # ── Petições ─────────────────────────────────────────────
+    "peticao": "peticao",
+    "peticao apresentada": "peticao_apresentada",
+    "peticao protocolizada": "peticao_apresentada",
+    "manifestacao": "manifestacao",
+
+    # ── Conclusão ────────────────────────────────────────────
+    "conclusao": "conclusao",
+    "conclusos": "conclusao",
+    "conclusos ao relator": "conclusao_relator",
+    "conclusos para despacho": "conclusao_despacho",
+    "conclusos para decisao": "conclusao_decisao",
+    "conclusos para decisao interlocutoria": "conclusao_decisao_interlocutoria",
+    "conclusos para julgamento": "conclusao_julgamento",
+    "conclusos para sentenca": "conclusao_sentenca",
+    "conclusos para despacho/decisao": "conclusao_despacho_decisao",
+
+    # ── Despacho / Decisão ───────────────────────────────────
+    "despacho": "despacho",
+    "despacho proferido": "despacho",
+    "proferido despacho de mero expediente": "despacho_mero_expediente",
+    "decisao": "decisao_generica",
+    "decisao proferida": "decisao_generica",
+    "decisao interlocutoria": "decisao_interlocutoria",
+    "decisao monocratica": "decisao_monocratica",
+    "proferida decisao": "decisao_generica",
+    "proferida decisao de saneamento": "decisao_saneamento",
+
+    # ── Sentença ─────────────────────────────────────────────
+    "sentenca": "sentenca_generica",
+    "sentenca proferida": "sentenca_generica",
+    "proferida sentenca": "sentenca_generica",
+    "sentenca absolutoria": "sentenca_absolutoria",
+    "sentenca condenatoria": "sentenca_condenatoria",
+    "sentenca de procedencia": "sentenca_procedencia",
+    "sentenca de improcedencia": "sentenca_improcedencia",
+    "sentenca de parcial procedencia": "sentenca_parcial_procedencia",
+    "sentenca homologatoria": "sentenca_homologatoria",
+    "sentenca com resolucao de merito": "sentenca_com_merito",
+    "sentenca sem resolucao de merito": "sentenca_sem_merito",
+    "sentenca de extincao": "sentenca_extincao",
+    "homologacao": "homologacao",
+
+    # ── Acórdão ──────────────────────────────────────────────
+    "acordao": "acordao",
+    "acordao proferido": "acordao",
+    "proferido acordao": "acordao",
+    "julgamento": "julgamento",
+
+    # ── Publicação / Intimação ───────────────────────────────
+    "publicado": "publicacao",
+    "publicacao": "publicacao",
+    "publicacao no dje": "publicacao_dje",
+    "publicacao no diario da justica eletronico": "publicacao_dje",
+    "disponibilizacao no dje": "disponibilizacao_dje",
+    "disponibilizado no diario da justica eletronico": "disponibilizacao_dje",
+    "intimacao": "intimacao",
+    "intimacao pessoal": "intimacao_pessoal",
+    "intimacao eletronica": "intimacao_eletronica",
+    "intimacao por carta": "intimacao_carta",
+    "expedicao de intimacao": "expedicao_intimacao",
+    "intimado": "intimacao",
+    "intimada a parte": "intimacao",
+
+    # ── Citação ──────────────────────────────────────────────
+    "citacao": "citacao",
+    "citado": "citacao",
+    "citacao pessoal": "citacao_pessoal",
+    "citacao por edital": "citacao_edital",
+    "citacao por hora certa": "citacao_hora_certa",
+    "citacao por mandado": "citacao_mandado",
+    "expedicao de citacao": "expedicao_citacao",
+    "expedido mandado de citacao": "expedicao_citacao_mandado",
+
+    # ── Mandados ─────────────────────────────────────────────
+    "mandado": "mandado",
+    "mandado expedido": "expedicao_mandado",
+    "expedicao de mandado": "expedicao_mandado",
+    "mandado devolvido": "devolucao_mandado",
+    "devolvido mandado": "devolucao_mandado",
+    "mandado cumprido": "cumprimento_mandado",
+    "mandado positivo": "mandado_positivo",
+    "mandado negativo": "mandado_negativo",
+    "mandado de intimacao": "mandado_intimacao",
+    "mandado de citacao": "mandado_citacao",
+    "devolvido mandado cumprido": "devolucao_mandado_cumprido",
+    "devolvido mandado nao cumprido": "devolucao_mandado_nao_cumprido",
+
+    # ── Prisão / Soltura ─────────────────────────────────────
+    "mandado de prisao": "mandado_prisao",
+    "mandado de prisao expedido": "mandado_prisao",
+    "expedicao de mandado de prisao": "mandado_prisao",
+    "mandado de prisao cumprido": "cumprimento_prisao",
+    "cumprimento de prisao": "cumprimento_prisao",
+    "alvara de soltura": "alvara_soltura",
+    "alvara de soltura expedido": "alvara_soltura",
+    "expedicao de alvara de soltura": "alvara_soltura",
+    "prisao preventiva decretada": "prisao_preventiva",
+    "prisao temporaria decretada": "prisao_temporaria",
+    "revogacao de prisao preventiva": "revogacao_prisao_preventiva",
+    "concedida liberdade provisoria": "liberdade_provisoria",
+    "liberdade provisoria concedida": "liberdade_provisoria",
+
+    # ── Audiência ────────────────────────────────────────────
+    "audiencia": "audiencia",
+    "audiencia designada": "audiencia_designada",
+    "designada audiencia": "audiencia_designada",
+    "audiencia realizada": "audiencia_realizada",
+    "audiencia de instrucao": "audiencia_instrucao",
+    "audiencia de instrucao e julgamento": "audiencia_instrucao_julgamento",
+    "audiencia de custodia": "audiencia_custodia",
+    "audiencia una": "audiencia_una",
+    "audiencia redesignada": "audiencia_redesignada",
+    "audiencia cancelada": "audiencia_cancelada",
+    "audiencia adiada": "audiencia_adiada",
+    "audiencia nao realizada": "audiencia_nao_realizada",
+
+    # ── Recurso ──────────────────────────────────────────────
+    "apelacao": "apelacao",
+    "apelacao interposta": "apelacao_interposta",
+    "interposto recurso de apelacao": "apelacao_interposta",
+    "agravo": "agravo",
+    "agravo interposto": "agravo_interposto",
+    "agravo em execucao": "agravo_execucao",
+    "recurso especial": "recurso_especial",
+    "recurso extraordinario": "recurso_extraordinario",
+    "embargos de declaracao": "embargos_declaracao",
+    "embargos de declaracao interpostos": "embargos_declaracao",
+    "embargos infringentes": "embargos_infringentes",
+    "recurso provido": "recurso_provido",
+    "recurso improvido": "recurso_improvido",
+    "recurso nao provido": "recurso_improvido",
+    "recurso parcialmente provido": "recurso_parcialmente_provido",
+    "recurso conhecido": "recurso_conhecido",
+    "recurso nao conhecido": "recurso_nao_conhecido",
+    "recurso recebido": "recurso_recebido",
+    "recurso rejeitado": "recurso_rejeitado",
+    "recurso negado": "recurso_improvido",
+    "recurso interposto": "recurso_interposto",
+    "contrarrazoes": "contrarrazoes",
+    "apresentadas contrarrazoes": "contrarrazoes_apresentadas",
+
+    # ── Trânsito / Extinção ──────────────────────────────────
+    "transito em julgado": "transito_em_julgado",
+    "transitado em julgado": "transito_em_julgado",
+    "certificado transito em julgado": "transito_em_julgado_certificado",
+    "extincao da punibilidade": "extincao_punibilidade",
+    "declarada extinta a punibilidade": "extincao_punibilidade",
+    "extincao do processo": "extincao_processo",
+    "processo extinto": "extincao_processo",
+    "extincao sem resolucao de merito": "extincao_sem_merito",
+    "extincao com resolucao de merito": "extincao_com_merito",
+    "arquivamento": "arquivamento",
+    "arquivado": "arquivamento",
+    "arquivamento definitivo": "arquivamento_definitivo",
+    "arquivamento provisorio": "arquivamento_provisorio",
+    "baixa definitiva": "baixa_definitiva",
+    "desarquivamento": "desarquivamento",
+    "desarquivado": "desarquivamento",
+
+    # ── Remessa / Vista ──────────────────────────────────────
+    "remessa": "remessa",
+    "remessa ao tribunal": "remessa_tribunal",
+    "remessa ao ministerio publico": "remessa_mp",
+    "remessa ao juizo": "remessa_juizo",
+    "remessa a defensoria publica": "remessa_defensoria",
+    "remessa ao distribuidor": "remessa_distribuidor",
+    "remessa dos autos": "remessa_autos",
+    "devolvidos os autos": "devolucao_autos",
+    "vista": "vista",
+    "vista ao ministerio publico": "vista_mp",
+    "vista a defesa": "vista_defesa",
+    "vista a parte autora": "vista_autor",
+    "vista a parte requerida": "vista_requerido",
+    "vista ao ministerio publico - vista": "vista_mp",
+
+    # ── Atos / Diligências ───────────────────────────────────
+    "ato ordinatorio praticado": "ato_ordinatorio",
+    "ato ordinatorio": "ato_ordinatorio",
+    "certidao emitida": "certidao_emitida",
+    "expedida certidao": "certidao_emitida",
+    "expedicao de certidao": "certidao_emitida",
+    "expedicao de guia": "expedicao_guia",
+    "expedida guia de recolhimento": "expedicao_guia_recolhimento",
+    "expedida carta precatoria": "expedicao_carta_precatoria",
+    "expedicao de carta precatoria": "expedicao_carta_precatoria",
+    "expedida carta rogatoria": "expedicao_carta_rogatoria",
+    "expedicao de oficio": "expedicao_oficio",
+    "expedido oficio": "expedicao_oficio",
+    "expedicao de edital": "expedicao_edital",
+    "expedido edital": "expedicao_edital",
+    "expedicao de documento": "expedicao_documento",
+
+    # ── Denúncia / Queixa (penal) ────────────────────────────
+    "denuncia oferecida": "denuncia_oferecida",
+    "oferecida denuncia": "denuncia_oferecida",
+    "denuncia recebida": "denuncia_recebida",
+    "recebimento da denuncia": "denuncia_recebida",
+    "denuncia rejeitada": "denuncia_rejeitada",
+    "rejeicao da denuncia": "denuncia_rejeitada",
+    "queixa oferecida": "queixa_oferecida",
+    "queixa recebida": "queixa_recebida",
+    "queixa rejeitada": "queixa_rejeitada",
+
+    # ── Resposta / Defesa ────────────────────────────────────
+    "resposta a acusacao": "resposta_acusacao",
+    "apresentada resposta": "resposta_apresentada",
+    "defesa preliminar": "defesa_preliminar",
+    "alegacoes finais": "alegacoes_finais",
+    "apresentadas alegacoes finais": "alegacoes_finais",
+    "memoriais": "memoriais",
+
+    # ── Pronúncia / Júri ─────────────────────────────────────
+    "pronuncia": "pronuncia",
+    "proferida pronuncia": "pronuncia",
+    "impronuncia": "impronuncia",
+    "absolvicao sumaria": "absolvicao_sumaria",
+    "julgamento em plenario": "julgamento_plenario",
+    "tribunal do juri": "tribunal_juri",
+
+    # ── Execução penal ───────────────────────────────────────
+    "execucao penal": "execucao_penal",
+    "inicio da execucao": "execucao_inicio",
+    "progressao de regime": "progressao_regime",
+    "regressao de regime": "regressao_regime",
+    "livramento condicional": "livramento_condicional",
+    "suspensao condicional da pena": "sursis",
+    "suspensao condicional do processo": "suspensao_condicional_processo",
+    "comutacao de pena": "comutacao_pena",
+    "indulto": "indulto",
+    "remicao de pena": "remicao_pena",
+    "detracao": "detracao",
+    "unificacao de penas": "unificacao_penas",
+
+    # ── Pagamento / Multa / Fiança ───────────────────────────
+    "pagamento de multa": "pagamento_multa",
+    "recolhimento de multa": "pagamento_multa",
+    "fianca arbitrada": "fianca_arbitrada",
+    "fianca recolhida": "fianca_recolhida",
+
+    # ── Custas ───────────────────────────────────────────────
+    "custas pagas": "custas_pagas",
+    "recolhidas custas": "custas_pagas",
+    "isencao de custas": "custas_isencao",
+    "concedida gratuidade de justica": "gratuidade_concedida",
+    "assistencia judiciaria gratuita": "gratuidade_concedida",
+
+    # ── Suspensão / Sobrestamento ────────────────────────────
+    "suspensao": "suspensao",
+    "suspensao do processo": "suspensao_processo",
+    "sobrestado o processo": "sobrestamento",
+    "sobrestamento": "sobrestamento",
+    "processo sobrestado": "sobrestamento",
+    "retomada do curso processual": "retomada_curso",
+
+    # ── Outros comuns TJSP ───────────────────────────────────
+    "proferida decisao": "decisao_generica",
+    "certificado": "certidao_emitida",
+    "aguardando": "aguardando",
+    "aguardando cumprimento": "aguardando_cumprimento",
+    "aguardando decurso de prazo": "aguardando_prazo",
+    "decurso de prazo": "decurso_prazo",
+    "prazo iniciado": "prazo_iniciado",
+    "prazo encerrado": "prazo_encerrado",
+    "nao havera julgamento nesta data": "julgamento_adiado",
+    "incluido em pauta": "inclusao_pauta",
+    "retirado de pauta": "retirado_pauta",
+    "adiado o julgamento": "julgamento_adiado",
+    "baixados os autos": "baixa_autos",
+    "cancelamento": "cancelamento",
+    "cancelada": "cancelamento",
+}

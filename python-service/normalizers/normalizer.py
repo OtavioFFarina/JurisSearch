@@ -1,10 +1,11 @@
 """Semantic Normalizer for Legal Terms.
 
 Takes raw movements, preserves them, and attaches a normalized
-string based on substring matching.
+string based on explicit dictionary mapping.
 """
 
 import logging
+import unicodedata
 from .base import BaseNormalizer
 from .legal_terms import LEGAL_MAPPING
 
@@ -13,6 +14,12 @@ logger = logging.getLogger(__name__)
 
 class SemanticNormalizer(BaseNormalizer):
     """Normalizes legal definitions based on static mapping list."""
+
+    def _canonical_key(self, text: str) -> str:
+        """Create deterministic key without changing original stored text."""
+        normalized = unicodedata.normalize("NFKD", text)
+        no_accents = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        return " ".join(no_accents.lower().strip().split())
 
     def normalize_movements(self, movimentos: list[dict]) -> list[dict]:
         """Normalize movements while strictly preserving original data."""
@@ -31,19 +38,11 @@ class SemanticNormalizer(BaseNormalizer):
                 normalizados.append(mov_dict)
                 continue
 
-            lowered_text = original_text.lower()
-            encontrou = False
+            canonical = self._canonical_key(original_text)
+            mapped = LEGAL_MAPPING.get(canonical)
 
-            # Search highest to lowest priority
-            for search_term, normalized_term in LEGAL_MAPPING:
-                if search_term in lowered_text:
-                    mov_dict["movimento_normalizado"] = normalized_term
-                    encontrou = True
-                    break  # Stop at first (most specific) match
-
-            # Fallback: if no match, use original text in lowercase
-            if not encontrou:
-                mov_dict["movimento_normalizado"] = lowered_text.strip()
+            # Controlled normalization: complement only when explicit mapping exists.
+            mov_dict["movimento_normalizado"] = mapped if mapped else canonical
 
             normalizados.append(mov_dict)
 

@@ -6,7 +6,7 @@
  */
 
 const API_BASE_URL = 'http://localhost:8000/api';
-const REQUEST_TIMEOUT = 8000; // 8 seconds
+const REQUEST_TIMEOUT = 75000; // 75 seconds (DataJud is slow)
 
 /**
  * Search for jurisprudência by query term.

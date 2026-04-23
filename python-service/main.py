@@ -14,9 +14,11 @@ from fastapi import FastAPI, Query
 from fastapi.middleware.cors import CORSMiddleware
 
 from collectors import TJSPCollector
+from collectors.esaj import ESAJSnapshotCollector
 from parsers import DatajudParser
 from classifiers import KeywordClassifier
 from normalizers import SemanticNormalizer
+from validators import DatajudEsajComparator
 
 # Load environment variables before anything else
 load_dotenv()
@@ -50,9 +52,12 @@ collector = TJSPCollector()
 parser = DatajudParser()
 normalizer = SemanticNormalizer()
 classifier = KeywordClassifier()
+esaj_collector = ESAJSnapshotCollector()
+comparator = DatajudEsajComparator()
 
 # Configuration
 MAX_RESULTS = int(os.getenv("MAX_RESULTS", "10"))
+ENABLE_CROSS_VALIDATION = os.getenv("ENABLE_CROSS_VALIDATION", "true").lower() == "true"
 
 
 @app.get("/search")
@@ -96,6 +101,11 @@ async def search(q: str = Query(..., min_length=2, description="Termo de busca")
             item["resultado"] = classificacao["resultado"]
             item["confidence"] = classificacao["confidence"]
             item["justificativa"] = classificacao["justificativa"]
+
+            # Validation Layer (DataJud vs e-SAJ snapshot) - no data mutation.
+            if ENABLE_CROSS_VALIDATION:
+                esaj_item = esaj_collector.find_by_processo(item.get("processo", ""))
+                item["validacao"] = comparator.validate(item, esaj_item).to_dict()
             
             # Detailed logging per item
             logger.info("Processo %s -> %s (Confiança: %s)", 
@@ -109,6 +119,7 @@ async def search(q: str = Query(..., min_length=2, description="Termo de busca")
             "results": results,
             "query": q,
             "total": len(results),
+            "validacao_ativa": ENABLE_CROSS_VALIDATION,
         }
 
     except Exception as exc:

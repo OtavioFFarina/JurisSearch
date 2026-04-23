@@ -1,6 +1,6 @@
 """Keyword-based classifier for legal decisions.
 
-Simple rule-based classification using keyword matching.
+Uses exact normalized tags from legal_terms.py (no substring guessing).
 Designed to be easily replaced with ML/NLP classifier in the future.
 """
 
@@ -12,101 +12,76 @@ logger = logging.getLogger(__name__)
 
 
 class KeywordClassifier(BaseClassifier):
-    """Classifies decisions based on keyword presence in text."""
+    """Classifies decisions based on exact normalized movement tags."""
 
-    FAVORAVEL = [
-        "absolvicao",
-        "recurso provido",
-        "ordem concedida",
-        "sentenca_reformada",
-        "decisao favoravel",
-        "alvara_soltura",
-        "trancamento_acao",
-        "extincao_punibilidade",
-    ]
+    # Tags must match values in legal_terms.LEGAL_MAPPING exactly.
+    SINAIS: dict[str, dict] = {
+        # ── Favoráveis ───────────────────────────────────
+        "sentenca_absolutoria":  {"tipo": "favorável", "peso": 10, "conf": "alta"},
+        "recurso_provido":      {"tipo": "favorável", "peso": 10, "conf": "alta"},
+        "alvara_soltura":       {"tipo": "favorável", "peso": 8,  "conf": "alta"},
+        "extincao_punibilidade":{"tipo": "favorável", "peso": 8,  "conf": "media"},
+        "extincao_processo":    {"tipo": "favorável", "peso": 6,  "conf": "media"},
+        "arquivamento":         {"tipo": "favorável", "peso": 5,  "conf": "media"},
+        "arquivamento_definitivo":{"tipo": "favorável","peso": 7, "conf": "media"},
+        "baixa_definitiva":     {"tipo": "favorável", "peso": 5,  "conf": "media"},
+        "recurso_parcialmente_provido": {"tipo": "favorável", "peso": 6, "conf": "media"},
 
-    DESFAVORAVEL = [
-        "condenacao",
-        "recurso improvido",
-        "ordem denegada",
-        "sentenca_mantida",
-        "decisao desfavoravel",
-        "sentenca_condenatoria",
-    ]
-
-    PESOS = {
-        "forte": 10,
-        "medio": 5,
-        "fraco": 2
+        # ── Desfavoráveis ────────────────────────────────
+        "sentenca_condenatoria":{"tipo": "desfavorável","peso": 10,"conf": "alta"},
+        "recurso_improvido":    {"tipo": "desfavorável","peso": 10,"conf": "alta"},
+        "mandado_prisao":       {"tipo": "desfavorável","peso": 8, "conf": "alta"},
+        "cumprimento_prisao":   {"tipo": "desfavorável","peso": 8, "conf": "alta"},
+        "transito_em_julgado":  {"tipo": "desfavorável","peso": 7, "conf": "media"},
     }
 
-    def _obter_peso_por_sinal(self, sinal: str, is_favoravel: bool) -> tuple[int, str]:
-        """Return the weight and confidence for a signal based on heuristics."""
-        # Simple heuristic since user required static mapping implementation
-        if "absolvicao" in sinal or "condenacao" in sinal or "concedida" in sinal or "provido" in sinal:
-            return self.PESOS["forte"], "alta"
-        if "alvara_soltura" in sinal or "trancamento_acao" in sinal or "extincao" in sinal or "mantida" in sinal:
-            return self.PESOS["medio"], "media"
-        return self.PESOS["fraco"], "baixa"
-
     def classify(self, movimentos: list[dict]) -> dict[str, str]:
-        """Classify based on analyzing normalized movements with explicability."""
+        """Classify based on exact match of normalized movement tags.
+
+        Iterates from most recent to oldest (DataJud order).
+        On tie (same weight), most recent wins.
+        """
         fallback = {
             "resultado": "neutro",
             "confidence": "baixa",
-            "justificativa": "Sem sinais favoráveis ou desfavoráveis claros nas movimentações encontradas."
+            "justificativa": "Sem sinais favoráveis ou desfavoráveis claros nas movimentações encontradas.",
         }
-        
+
         if not movimentos:
             return fallback
 
         try:
-            maior_peso = 0
-            resultado_final = "neutro"
-            confidence_final = "baixa"
-            justificativa_final = fallback["justificativa"]
+            melhor_peso = 0
+            resultado = "neutro"
+            confidence = "baixa"
+            justificativa = fallback["justificativa"]
 
-            # Reverse the list so the most recent is checked last?
-            # Or iterate specifically looking for strongest since user said:
-            # "se houver conflito (favorável vs desfavorável): usar movimento mais recente"
-            # Assuming list is already most recent first (from DATAJUD)
-            # We want the HIGHEST weight. If weights are equal, we want the most recent.
-            # So by iterating chronological or reverse, we can do this.
-            
             for mov in movimentos:
                 norm = mov.get("movimento_normalizado", "")
                 if not norm:
                     continue
-                
-                # Check favorable
-                for fav in self.FAVORAVEL:
-                    if fav in norm:
-                        peso, conf = self._obter_peso_por_sinal(fav, True)
-                        # If weight is GREATER, we replace. So earlier (more recent) only gets replaced 
-                        # if a stronger signal is found later. This satisfies "most recent wins ties".
-                        if peso >= maior_peso:  
-                            maior_peso = peso
-                            resultado_final = "favorável"
-                            confidence_final = conf
-                            justificativa_final = f"Classificado como favorável por conter '{fav}' nos movimentos."
 
-                # Check unfavorable
-                for des in self.DESFAVORAVEL:
-                    if des in norm:
-                        peso, conf = self._obter_peso_por_sinal(des, False)
-                        if peso >= maior_peso:
-                            maior_peso = peso
-                            resultado_final = "desfavorável"
-                            confidence_final = conf
-                            justificativa_final = f"Classificado como desfavorável por conter '{des}' nos movimentos."
+                sinal = self.SINAIS.get(norm)
+                if not sinal:
+                    continue
 
-            if maior_peso == 0:
+                # >= garante que, em empate de peso, o mais recente (primeiro na lista) vence.
+                if sinal["peso"] >= melhor_peso:
+                    melhor_peso = sinal["peso"]
+                    resultado = sinal["tipo"]
+                    confidence = sinal["conf"]
+                    justificativa = (
+                        f"Classificado como {sinal['tipo']} com base na movimentação "
+                        f"'{mov.get('movimento_original', norm)}'."
+                    )
+
+            if melhor_peso == 0:
                 return fallback
 
             return {
-                "resultado": resultado_final,
-                "confidence": confidence_final,
-                "justificativa": justificativa_final
+                "resultado": resultado,
+                "confidence": confidence,
+                "justificativa": justificativa,
             }
 
         except Exception as exc:
